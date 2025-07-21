@@ -1,4 +1,3 @@
-
 import csv
 import random
 import os
@@ -10,7 +9,6 @@ from tkinter import messagebox
 
 # Constants
 DATA_FOLDER = "data"            # Folder where subject CSV files are stored
-NUM_QUESTIONS = 50              # Total number of questions to generate
 
 # Load questions from the selected subject file
 def load_questions(subject):
@@ -18,21 +16,33 @@ def load_questions(subject):
     with open(filepath, 'r', encoding='utf-8') as f:
         return list(csv.DictReader(f))
 
-# Randomly select questions based on count
-def generate_paper(questions, count):
-    return random.sample(questions, min(count, len(questions)))
+# Generate paper based on subject type
+def generate_paper(subject, questions):
+    if subject.lower() == "computer":
+        # Only MCQs, total 50 marks
+        return random.sample([q for q in questions if q['type'] == 'mcq'], min(50, len(questions)))
+    else:
+        # 15 MCQs and 85 other questions (paragraph/diagram)
+        mcqs = [q for q in questions if q['type'] == 'mcq'][:15]
+        others = [q for q in questions if q['type'] in ['paragraph', 'diagram']]
+        remaining = random.sample(others, min(85, len(others)))
+        return mcqs + remaining
 
 # Export the paper as a PDF file
 def export_pdf(paper, subject, filename=None):
     filename = filename or f"Class12_{subject}_Paper.pdf"
     c = canvas.Canvas(filename, pagesize=A4)
     width, height = A4
-    x_margin = 50               # Left margin
-    y = height - 50             # Start from top of the page
+    x_margin = 50
+    y = height - 50
 
     # PDF Title Section
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(x_margin, y, f"ધોરણ ૧૨ – {subject.capitalize()} (MCQ Only)")
+    if subject.lower() == "computer":
+        title_line = f"ધોરણ ૧૨ – {subject.capitalize()} (માત્ર MCQ પ્રશ્નપત્ર – 50 ગુણ)"
+    else:
+        title_line = f"ધોરણ ૧૨ – {subject.capitalize()} (મુલ્યાંકન પત્ર – 100 ગુણ)"
+    c.drawString(x_margin, y, title_line)
     y -= 30
     c.setFont("Helvetica", 12)
     c.drawString(x_margin, y, "Most Important Question Paper")
@@ -44,13 +54,12 @@ def export_pdf(paper, subject, filename=None):
 
     # Add questions one by one
     for i, q in enumerate(paper, 1):
-        # Prepare question line
         question_text = f"{i}. {q['question']} ({q['rarity']})"
         lines = split_text(question_text, 90)
         for line in lines:
             c.drawString(x_margin, y, line)
             y -= 16
-            if y < 60:  # Create new page if bottom is reached
+            if y < 60:
                 c.showPage()
                 y = height - 50
 
@@ -68,7 +77,7 @@ def export_pdf(paper, subject, filename=None):
             y -= 16
         y -= 10
 
-    c.save()  # Save PDF file
+    c.save()
     return filename
 
 # Helper to split long lines into multiple lines for PDF
@@ -86,7 +95,7 @@ def split_text(text, max_length):
         lines.append(current)
     return lines
 
-# Graphical User Interface
+# GUI to input subject and generate paper
 def run_gui():
     def on_generate():
         subject = subject_var.get().strip().lower()
@@ -94,24 +103,22 @@ def run_gui():
             messagebox.showerror("Error", "Please enter a subject.")
             return
         try:
-            # Load and generate paper
             questions = load_questions(subject)
-            paper = generate_paper(questions, NUM_QUESTIONS)
+            paper = generate_paper(subject, questions)
             filename = export_pdf(paper, subject)
             messagebox.showinfo("Success", f"PDF saved as '{filename}'")
         except FileNotFoundError:
             messagebox.showerror("Error", f"Subject file '{subject}.csv' not found in 'data/' folder.")
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred:\n{str(e)}")
 
-    # Create main window
     root = tk.Tk()
     root.title("Class 12 Question Paper Generator")
 
-    # Subject input
     tk.Label(root, text="Enter Subject Name:").pack(pady=5)
     subject_var = tk.StringVar()
     tk.Entry(root, textvariable=subject_var, width=30).pack(pady=5)
 
-    # Generate button
     tk.Button(root, text="Generate Question Paper", command=on_generate).pack(pady=10)
 
     root.mainloop()
